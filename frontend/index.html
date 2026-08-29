@@ -1,0 +1,626 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fault-Tolerant Data Ingestion</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f7f9;
+        --panel: #ffffff;
+        --ink: #1d2433;
+        --muted: #687386;
+        --line: #d9dee7;
+        --accent: #176b87;
+        --accent-dark: #0f4f64;
+        --ok: #0f766e;
+        --bad: #b42318;
+        --soft-ok: #e6f4f1;
+        --soft-bad: #fff0ed;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      header {
+        border-bottom: 1px solid var(--line);
+        background: var(--panel);
+      }
+
+      .shell {
+        width: min(1180px, calc(100vw - 32px));
+        margin: 0 auto;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 0;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0;
+      }
+
+      .status-pill {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        color: var(--muted);
+        font-size: 13px;
+        padding: 6px 10px;
+        white-space: nowrap;
+      }
+
+      main {
+        padding: 24px 0 32px;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: minmax(320px, 420px) 1fr;
+        gap: 18px;
+        align-items: start;
+      }
+
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-bottom: 1px solid var(--line);
+        padding: 14px 16px;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 16px;
+        letter-spacing: 0;
+      }
+
+      .panel-body {
+        padding: 16px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      textarea,
+      input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fbfcfd;
+        color: var(--ink);
+        font: inherit;
+      }
+
+      textarea {
+        min-height: 250px;
+        resize: vertical;
+        padding: 12px;
+        font-family: "Cascadia Code", Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      input {
+        height: 38px;
+        padding: 8px 10px;
+      }
+
+      textarea:focus,
+      input:focus {
+        border-color: var(--accent);
+        outline: 3px solid rgba(23, 107, 135, 0.15);
+      }
+
+      .field {
+        margin-bottom: 14px;
+      }
+
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--ink);
+        font-size: 14px;
+        margin: 8px 0 16px;
+      }
+
+      .checkbox-row input {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent);
+      }
+
+      button {
+        min-height: 40px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+        padding: 9px 14px;
+      }
+
+      button:hover {
+        background: var(--accent-dark);
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .button-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .secondary {
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+      }
+
+      .secondary:hover {
+        background: #f1f4f8;
+      }
+
+      .message {
+        min-height: 22px;
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .message.error {
+        color: var(--bad);
+      }
+
+      .message.success {
+        color: var(--ok);
+      }
+
+      .filters {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .dashboard {
+        display: grid;
+        gap: 18px;
+      }
+
+      .event-grid {
+        display: grid;
+        gap: 10px;
+      }
+
+      .event-row,
+      .aggregate-row {
+        display: grid;
+        gap: 6px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px;
+        background: #fbfcfd;
+      }
+
+      .event-row.processed {
+        border-color: #b7ddd6;
+        background: var(--soft-ok);
+      }
+
+      .event-row.rejected {
+        border-color: #ffd1c8;
+        background: var(--soft-bad);
+      }
+
+      .row-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .metric {
+        font-weight: 750;
+        overflow-wrap: anywhere;
+      }
+
+      .badge {
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 750;
+        padding: 4px 8px;
+        text-transform: uppercase;
+      }
+
+      .badge.processed {
+        background: #ccebe5;
+        color: #075e55;
+      }
+
+      .badge.rejected {
+        background: #ffd8d2;
+        color: #9b1c12;
+      }
+
+      .meta {
+        color: var(--muted);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+
+      .empty {
+        border: 1px dashed var(--line);
+        border-radius: 6px;
+        color: var(--muted);
+        padding: 16px;
+        text-align: center;
+      }
+
+      .aggregate-row {
+        grid-template-columns: 1fr auto auto;
+        align-items: center;
+      }
+
+      .number {
+        font-variant-numeric: tabular-nums;
+        font-weight: 750;
+      }
+
+      @media (max-width: 860px) {
+        .layout,
+        .filters {
+          grid-template-columns: 1fr;
+        }
+
+        .topbar,
+        .row-top {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .status-pill {
+          white-space: normal;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="shell topbar">
+        <h1>Fault-Tolerant Data Ingestion</h1>
+        <div class="status-pill" id="refreshStatus">Ready</div>
+      </div>
+    </header>
+
+    <main class="shell">
+      <div class="layout">
+        <section>
+          <div class="panel-head">
+            <h2>Submit Raw Event</h2>
+          </div>
+          <div class="panel-body">
+            <div class="field">
+              <label for="eventJson">Event JSON</label>
+              <textarea id="eventJson" spellcheck="false">{
+  "source": "client_A",
+  "payload": {
+    "metric": "sales",
+    "amount": "1200",
+    "timestamp": "2024/01/01"
+  }
+}</textarea>
+            </div>
+
+            <label class="checkbox-row">
+              <input id="simulateFailure" type="checkbox">
+              Simulate failure before commit
+            </label>
+
+            <div class="button-row">
+              <button id="submitButton" type="button">Submit Event</button>
+              <button class="secondary" id="sampleButton" type="button">Load Variant</button>
+            </div>
+
+            <div id="message" class="message"></div>
+          </div>
+        </section>
+
+        <div class="dashboard">
+          <section>
+            <div class="panel-head">
+              <h2>Filters</h2>
+              <button class="secondary" id="refreshButton" type="button">Refresh</button>
+            </div>
+            <div class="panel-body filters">
+              <div>
+                <label for="clientFilter">Client ID</label>
+                <input id="clientFilter" placeholder="client_A">
+              </div>
+              <div>
+                <label for="fromFilter">From</label>
+                <input id="fromFilter" type="date">
+              </div>
+              <div>
+                <label for="toFilter">To</label>
+                <input id="toFilter" type="date">
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <div class="panel-head">
+              <h2>Aggregated Results</h2>
+            </div>
+            <div class="panel-body">
+              <div id="aggregateList" class="event-grid"></div>
+            </div>
+          </section>
+
+          <section>
+            <div class="panel-head">
+              <h2>Processed Events</h2>
+            </div>
+            <div class="panel-body">
+              <div id="processedList" class="event-grid"></div>
+            </div>
+          </section>
+
+          <section>
+            <div class="panel-head">
+              <h2>Rejected / Failed Events</h2>
+            </div>
+            <div class="panel-body">
+              <div id="rejectedList" class="event-grid"></div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const eventJson = document.querySelector('#eventJson');
+      const simulateFailure = document.querySelector('#simulateFailure');
+      const submitButton = document.querySelector('#submitButton');
+      const sampleButton = document.querySelector('#sampleButton');
+      const refreshButton = document.querySelector('#refreshButton');
+      const message = document.querySelector('#message');
+      const refreshStatus = document.querySelector('#refreshStatus');
+      const clientFilter = document.querySelector('#clientFilter');
+      const fromFilter = document.querySelector('#fromFilter');
+      const toFilter = document.querySelector('#toFilter');
+      const processedList = document.querySelector('#processedList');
+      const rejectedList = document.querySelector('#rejectedList');
+      const aggregateList = document.querySelector('#aggregateList');
+      const failedSubmissions = [];
+
+      const samples = [
+        {
+          source: 'client_A',
+          payload: {
+            metric: 'sales',
+            amount: '1200',
+            timestamp: '2024/01/01'
+          }
+        },
+        {
+          source: 'client_B',
+          payload: {
+            event_type: 'refund',
+            value: '49.95',
+            date: 'Jan 3 2024 10:30'
+          }
+        },
+        {
+          source: 'client_C',
+          payload: {
+            type: 'signup',
+            value: 1,
+            time: '2024-02-14T15:00:00Z',
+            extra_field: 'ignored safely'
+          }
+        }
+      ];
+
+      let sampleIndex = 0;
+
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#039;'
+        }[char]));
+      }
+
+      function setMessage(text, type = '') {
+        message.textContent = text;
+        message.className = `message ${type}`;
+      }
+
+      function queryString(includeDates = false) {
+        const params = new URLSearchParams();
+        if (clientFilter.value.trim()) {
+          params.set('client_id', clientFilter.value.trim());
+        }
+        if (includeDates && fromFilter.value) {
+          params.set('from', fromFilter.value);
+        }
+        if (includeDates && toFilter.value) {
+          params.set('to', toFilter.value);
+        }
+        return params.toString();
+      }
+
+      async function requestJson(url, options) {
+        const response = await fetch(url, options);
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || data.error || 'Request failed');
+        }
+        return data;
+      }
+
+      function renderEvents(container, rows, status) {
+        if (!rows.length) {
+          container.innerHTML = '<div class="empty">No events found.</div>';
+          return;
+        }
+
+        container.innerHTML = rows.map((row) => `
+          <article class="event-row ${status}">
+            <div class="row-top">
+              <div class="metric">${escapeHtml(row.metric || row.client_id || 'Rejected event')}</div>
+              <span class="badge ${status}">${status}</span>
+            </div>
+            <div class="meta">Client: ${escapeHtml(row.client_id || 'unknown')}</div>
+            <div class="meta">Amount: ${escapeHtml(row.amount ?? '-')} | Time: ${escapeHtml(row.timestamp || '-')}</div>
+            ${row.reject_reason ? `<div class="meta">Reason: ${escapeHtml(row.reject_reason)}</div>` : ''}
+            <div class="meta">Key: ${escapeHtml(row.idempotency_key.slice(0, 18))}...</div>
+          </article>
+        `).join('');
+      }
+
+      function renderRejectedAndFailed(rows) {
+        const failedRows = failedSubmissions.map((failure) => `
+          <article class="event-row rejected">
+            <div class="row-top">
+              <div class="metric">Failed submission</div>
+              <span class="badge rejected">failed</span>
+            </div>
+            <div class="meta">Reason: ${escapeHtml(failure.reason)}</div>
+            <div class="meta">Time: ${escapeHtml(failure.time)}</div>
+          </article>
+        `);
+
+        const rejectedRows = rows.map((row) => `
+          <article class="event-row rejected">
+            <div class="row-top">
+              <div class="metric">${escapeHtml(row.metric || row.client_id || 'Rejected event')}</div>
+              <span class="badge rejected">rejected</span>
+            </div>
+            <div class="meta">Client: ${escapeHtml(row.client_id || 'unknown')}</div>
+            <div class="meta">Amount: ${escapeHtml(row.amount ?? '-')} | Time: ${escapeHtml(row.timestamp || '-')}</div>
+            <div class="meta">Reason: ${escapeHtml(row.reject_reason)}</div>
+            <div class="meta">Key: ${escapeHtml(row.idempotency_key.slice(0, 18))}...</div>
+          </article>
+        `);
+
+        const combinedRows = [...failedRows, ...rejectedRows];
+        rejectedList.innerHTML = combinedRows.length
+          ? combinedRows.join('')
+          : '<div class="empty">No rejected or failed events found.</div>';
+      }
+
+      function renderAggregate(rows) {
+        if (!rows.length) {
+          aggregateList.innerHTML = '<div class="empty">No processed events match the filters.</div>';
+          return;
+        }
+
+        aggregateList.innerHTML = rows.map((row) => `
+          <article class="aggregate-row">
+            <div class="metric">${escapeHtml(row.metric)}</div>
+            <div class="meta">Count <span class="number">${escapeHtml(row.count)}</span></div>
+            <div class="meta">Total <span class="number">${escapeHtml(row.total_amount)}</span></div>
+          </article>
+        `).join('');
+      }
+
+      async function refreshAll() {
+        refreshStatus.textContent = 'Refreshing...';
+        const eventsQuery = queryString(false);
+        const aggregateQuery = queryString(true);
+        const [events, aggregate] = await Promise.all([
+          requestJson(`/events${eventsQuery ? `?${eventsQuery}` : ''}`),
+          requestJson(`/aggregate${aggregateQuery ? `?${aggregateQuery}` : ''}`)
+        ]);
+
+        renderEvents(processedList, events.processed, 'processed');
+        renderRejectedAndFailed(events.rejected);
+        renderAggregate(aggregate.results);
+        refreshStatus.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+      }
+
+      async function submitEvent() {
+        submitButton.disabled = true;
+        setMessage('Submitting...');
+
+        try {
+          const parsed = JSON.parse(eventJson.value);
+          parsed.simulateFailure = simulateFailure.checked;
+
+          const result = await requestJson('/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(parsed)
+          });
+
+          setMessage(result.note, result.status === 'rejected' ? 'error' : 'success');
+          await refreshAll();
+        } catch (error) {
+          failedSubmissions.unshift({
+            reason: error.message,
+            time: new Date().toLocaleString()
+          });
+          setMessage(error.message, 'error');
+          try {
+            await refreshAll();
+          } catch {
+            renderRejectedAndFailed([]);
+          }
+        } finally {
+          submitButton.disabled = false;
+        }
+      }
+
+      submitButton.addEventListener('click', submitEvent);
+      refreshButton.addEventListener('click', () => refreshAll().catch((error) => setMessage(error.message, 'error')));
+      clientFilter.addEventListener('input', () => refreshAll().catch(() => {}));
+      fromFilter.addEventListener('change', () => refreshAll().catch(() => {}));
+      toFilter.addEventListener('change', () => refreshAll().catch(() => {}));
+      sampleButton.addEventListener('click', () => {
+        sampleIndex = (sampleIndex + 1) % samples.length;
+        eventJson.value = JSON.stringify(samples[sampleIndex], null, 2);
+      });
+
+      refreshAll().catch((error) => {
+        refreshStatus.textContent = 'Refresh failed';
+        setMessage(error.message, 'error');
+      });
+    </script>
+  </body>
+</html>

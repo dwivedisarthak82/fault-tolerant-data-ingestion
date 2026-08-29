@@ -1,0 +1,13 @@
+{
+  "name": "fault-tolerant-data-ingestion",
+  "version": "1.0.0",
+  "description": "Single-process Express and SQLite app for fault-tolerant event ingestion.",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0",
+    "express": "^5.1.0"
+  }
+}
