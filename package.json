@@ -4,7 +4,9 @@
   "description": "Single-process Express and SQLite app for fault-tolerant event ingestion.",
   "main": "backend/server.js",
   "scripts": {
-    "start": "node backend/server.js"
+    "start": "node backend/server.js",
+    "check": "node --check backend/server.js && node --check backend/db.js && node --check backend/normalize.js && node --check backend/aggregation.js && node --check scripts/smoke-test.js",
+    "test": "node scripts/smoke-test.js"
   },
   "dependencies": {
     "better-sqlite3": "^12.2.0",
